@@ -15,6 +15,7 @@ export const CustomizerModal: React.FC<CustomizerProps> = ({ config, isAdmin, on
   const [formData, setFormData] = useState<CoupleConfig>(config);
   const [shareName, setShareName] = useState<string>('Mansi');
   const [copied, setCopied] = useState<boolean>(false);
+  const [isDownloading, setIsDownloading] = useState<boolean>(false);
 
   const handleChange = (field: keyof CoupleConfig, value: unknown) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -40,6 +41,99 @@ export const CustomizerModal: React.FC<CustomizerProps> = ({ config, isAdmin, on
 
   const currentShareUrl = getShareUrl(shareName);
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&color=f43f5e&bgcolor=0f172a&margin=10&data=${encodeURIComponent(currentShareUrl)}`;
+
+  // Direct Blob PNG Download for QR Code Image Scanner Card
+  const handleDownloadQR = async () => {
+    setIsDownloading(true);
+    try {
+      // Create offscreen canvas for a high-res romantic QR card
+      const canvas = document.createElement('canvas');
+      canvas.width = 600;
+      canvas.height = 700;
+      const ctx = canvas.getContext('2d');
+
+      if (ctx) {
+        // Gradient Background
+        const grad = ctx.createLinearGradient(0, 0, 600, 700);
+        grad.addColorStop(0, '#020617');
+        grad.addColorStop(0.5, '#1e1b4b');
+        grad.addColorStop(1, '#4c0519');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, 600, 700);
+
+        // Outer Glow Border
+        ctx.strokeStyle = '#f43f5e';
+        ctx.lineWidth = 6;
+        ctx.strokeRect(20, 20, 560, 660);
+
+        // Header Title
+        ctx.fillStyle = '#fecdd3';
+        ctx.font = 'bold 32px serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Until I Found You 💖', 300, 80);
+
+        // Subtitle
+        ctx.fillStyle = '#f472b6';
+        ctx.font = '20px sans-serif';
+        ctx.fillText(`A Special Romantic Journey For ${shareName || 'You'}`, 300, 125);
+
+        // Load QR Code Image cross-origin
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.src = qrCodeUrl;
+
+        await new Promise((resolve) => {
+          img.onload = resolve;
+          img.onerror = resolve;
+        });
+
+        // Draw QR Code in Center
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(150, 160, 300, 300);
+        ctx.drawImage(img, 150, 160, 300, 300);
+
+        // Instructions Footer
+        ctx.fillStyle = '#fda4af';
+        ctx.font = 'bold 18px sans-serif';
+        ctx.fillText('Scan with Camera to Play 🎵', 300, 510);
+
+        ctx.fillStyle = '#cbd5e1';
+        ctx.font = '14px sans-serif';
+        ctx.fillText(currentShareUrl, 300, 560);
+
+        ctx.fillStyle = '#f43f5e';
+        ctx.font = 'italic 16px serif';
+        ctx.fillText('✨ Made with Love ✨', 300, 620);
+
+        // Export Canvas to Data URL & Download
+        const dataUrl = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.href = dataUrl;
+        link.download = `Until_I_Found_You_${shareName || 'QR'}_ScannerCard.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    } catch {
+      // Fallback: Direct Blob fetch
+      try {
+        const res = await fetch(qrCodeUrl);
+        const blob = await res.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = `Until_I_Found_You_${shareName || 'QR'}_Scanner.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(blobUrl);
+      } catch {
+        window.open(qrCodeUrl, '_blank');
+      }
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   // If recipient girl (not Admin mode), hide Settings gear completely!
   if (!isAdmin) {
@@ -128,17 +222,15 @@ export const CustomizerModal: React.FC<CustomizerProps> = ({ config, isAdmin, on
                   </p>
                 )}
 
-                {/* Download QR Card */}
-                <a
-                  href={qrCodeUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  download={`Until_I_Found_You_${shareName}_QR.png`}
-                  className="w-full py-2 rounded-xl bg-white/10 hover:bg-white/20 text-rose-200 font-medium text-xs flex items-center justify-center gap-1.5 transition-all"
+                {/* Direct Download Button */}
+                <button
+                  onClick={handleDownloadQR}
+                  disabled={isDownloading}
+                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-pink-600 via-rose-500 to-amber-500 hover:from-pink-500 hover:to-amber-400 text-white font-semibold text-xs flex items-center justify-center gap-1.5 shadow-lg transition-all cursor-pointer disabled:opacity-50"
                 >
-                  <Download className="w-3.5 h-3.5 text-amber-300" />
-                  <span>Save QR Image Scanner 📥</span>
-                </a>
+                  <Download className="w-3.5 h-3.5 text-amber-200" />
+                  <span>{isDownloading ? 'Generating PNG Card...' : 'Save QR Card PNG 📥'}</span>
+                </button>
               </div>
 
               {/* STORY DETAILS EDIT */}
